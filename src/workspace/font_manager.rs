@@ -9,7 +9,7 @@ use memmap2::Mmap;
 use once_cell::sync::OnceCell;
 use tower_lsp::lsp_types::Url;
 use typst::font::{Font, FontBook, FontInfo};
-use typst::util::Buffer;
+use typst::util::Bytes;
 use walkdir::WalkDir;
 
 use super::resource_manager::ResourceManager;
@@ -82,7 +82,7 @@ impl Builder {
     /// Add fonts that are embedded in the binary.
     pub fn with_embedded(mut self) -> Self {
         let mut add = |bytes: &'static [u8]| {
-            let buffer = Buffer::from_static(bytes);
+            let buffer = Bytes::from_static(bytes);
             for (i, font) in Font::iter(buffer).enumerate() {
                 self.book.push(font.info().clone());
                 self.fonts.push(FontSlot {

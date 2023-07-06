@@ -6,8 +6,8 @@ use tokio::sync::OwnedRwLockReadGuard;
 use typst::diag::{FileError, FileResult};
 use typst::eval::{Datetime, Library};
 use typst::font::{Font, FontBook};
-use typst::syntax::SourceId;
-use typst::util::Buffer;
+use typst::file::FileId;
+use typst::util::Bytes;
 use typst::World;
 
 use crate::workspace::source::Source;
@@ -17,14 +17,14 @@ use super::{typst_to_lsp, TypstPath, TypstSource};
 
 pub struct WorkspaceWorld {
     workspace: OwnedRwLockReadGuard<Workspace>,
-    main: SourceId,
+    main: FileId,
     root_path: Option<PathBuf>,
 }
 
 impl WorkspaceWorld {
     pub fn new(
         workspace: OwnedRwLockReadGuard<Workspace>,
-        main: SourceId,
+        main: FileId,
         root_path: Option<PathBuf>,
     ) -> Self {
         Self {
@@ -47,35 +47,29 @@ impl WorkspaceWorld {
 }
 
 impl World for WorkspaceWorld {
-    fn root(&self) -> &Path {
-        match &self.root_path {
-            Some(path) => path.as_ref(),
-            None => Path::new(""),
-        }
-    }
+    // fn root(&self) -> &Path {
+    //     match &self.root_path {
+    //         Some(path) => path.as_ref(),
+    //         None => Path::new(""),
+    //     }
+    // }
 
     fn library(&self) -> &Prehashed<Library> {
         let workspace = self.get_workspace();
         &workspace.typst_stdlib
     }
 
-    fn main(&self) -> &TypstSource {
-        self.source(self.main)
+    fn main(&self) -> TypstSource {
+        self.source(self.main).unwrap()
     }
 
-    fn resolve(&self, typst_path: &TypstPath) -> FileResult<SourceId> {
-        let lsp_uri = typst_to_lsp::path_to_uri(typst_path)
-            .map_err(|_| FileError::NotFound(typst_path.to_owned()))?;
-        self.get_workspace().sources.get_id_by_uri(lsp_uri)
-    }
-
-    fn source(&self, id: SourceId) -> &TypstSource {
+    fn source(&self, id: FileId) -> FileResult<TypstSource> {
         let lsp_source = self
             .get_workspace()
             .sources
             .get_source_by_id(id)
             .expect("source should have been cached by `resolve`, so won't cause an error");
-        lsp_source.as_ref()
+        Ok(lsp_source.as_ref().clone())
     }
 
     fn book(&self) -> &Prehashed<FontBook> {
@@ -87,7 +81,8 @@ impl World for WorkspaceWorld {
         self.get_workspace().fonts.font(id, &mut resources)
     }
 
-    fn file(&self, typst_path: &TypstPath) -> FileResult<Buffer> {
+    fn file(&self, id: FileId) -> FileResult<Bytes> {
+        let typst_path = id.path();
         let lsp_uri = typst_to_lsp::path_to_uri(typst_path)
             .map_err(|_| FileError::NotFound(typst_path.to_owned()))?;
         let mut resources = self.get_workspace().resources.write();

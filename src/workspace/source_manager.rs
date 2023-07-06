@@ -7,14 +7,14 @@ use parking_lot::RwLock;
 use tower_lsp::lsp_types::Url;
 use tracing::{info, trace};
 use typst::diag::FileResult;
-use typst::syntax::SourceId;
+use typst::file::FileId;
 use walkdir::WalkDir;
 
 use crate::lsp_typst_boundary::{lsp_to_typst, typst_to_lsp};
 
 use super::source::Source;
 
-/// Provides access to [`Source`] documents via [`SourceId`]s and [`Url`]s
+/// Provides access to [`Source`] documents via [`FileId`]s and [`Url`]s
 ///
 /// A document can be open or closed. "Open" and "closed" correspond to the document's reported
 /// state in the LSP client.
@@ -39,12 +39,12 @@ impl SourceManager {
         self.get_mut_all_by_uri(uri).map(|(source, _)| source)
     }
 
-    /// Get a document's [`SourceId`] by its URI, caching it and adding it to the `SourceManager` if needed
-    pub fn get_id_by_uri(&self, uri: Url) -> FileResult<SourceId> {
+    /// Get a document's [`FileId`] by its URI, caching it and adding it to the `SourceManager` if needed
+    pub fn get_id_by_uri(&self, uri: Url) -> FileResult<FileId> {
         self.get_all_by_uri(uri).map(|(_, id)| id)
     }
 
-    pub fn get_source_by_id(&self, id: SourceId) -> FileResult<&Source> {
+    pub fn get_source_by_id(&self, id: FileId) -> FileResult<&Source> {
         match self.get_inner_source(id) {
             InnerSource::Closed(cell, uri) => {
                 cell.get_or_try_init(|| Source::read_from_file(id, uri))
@@ -58,7 +58,7 @@ impl SourceManager {
     pub fn open(&mut self, uri: &Url, text: String) -> anyhow::Result<()> {
         let ids = self.ids.get_mut();
         let (index, uri_is_new) = ids.insert_full(uri.clone());
-        let id = SourceId::from_u16(index as u16);
+        let id = FileId::from_u16(index as u16);
         let source = Source::new(id, uri, text)?;
 
         if uri_is_new {
@@ -118,13 +118,13 @@ impl SourceManager {
         Ok(())
     }
 
-    /// Get a [`Source`] and its [`SourceId`] by its URI, caching it and adding it to the
+    /// Get a [`Source`] and its [`FileId`] by its URI, caching it and adding it to the
     /// `SourceManager` if needed
     #[tracing::instrument(skip_all, fields(%uri))]
-    pub fn get_all_by_uri(&self, uri: Url) -> FileResult<(&Source, SourceId)> {
+    pub fn get_all_by_uri(&self, uri: Url) -> FileResult<(&Source, FileId)> {
         let mut ids = self.ids.write();
         let (index, uri_is_new) = ids.insert_full(uri.clone());
-        let id = SourceId::from_u16(index as u16);
+        let id = FileId::from_u16(index as u16);
 
         let source = if uri_is_new {
             let source = Source::read_from_file(id, &uri)?;
@@ -144,13 +144,13 @@ impl SourceManager {
         Ok((source, id))
     }
 
-    /// Get a [`Source`] and its [`SourceId`] by its URI, caching it and adding it to the
+    /// Get a [`Source`] and its [`FileId`] by its URI, caching it and adding it to the
     /// `SourceManager` if needed
     #[tracing::instrument(skip_all, fields(%uri))]
-    pub fn get_mut_all_by_uri(&mut self, uri: Url) -> FileResult<(&mut Source, SourceId)> {
+    pub fn get_mut_all_by_uri(&mut self, uri: Url) -> FileResult<(&mut Source, FileId)> {
         let ids = self.ids.get_mut();
         let (index, uri_is_new) = ids.insert_full(uri.clone());
-        let id = SourceId::from_u16(index as u16);
+        let id = FileId::from_u16(index as u16);
 
         let source = if uri_is_new {
             let source = Source::read_from_file(id, &uri)?;
@@ -175,20 +175,20 @@ impl SourceManager {
         Ok((source, id))
     }
 
-    fn get_id_by_known_uri(&self, uri: &Url) -> Option<SourceId> {
+    fn get_id_by_known_uri(&self, uri: &Url) -> Option<FileId> {
         self.ids
             .read()
             .get_index_of(uri)
-            .map(|id| SourceId::from_u16(id as u16))
+            .map(|id| FileId::from_u16(id as u16))
     }
 
-    fn get_inner_source(&self, id: SourceId) -> &InnerSource {
-        // We treat all `SourceId`s as valid
+    fn get_inner_source(&self, id: FileId) -> &InnerSource {
+        // We treat all `FileId`s as valid
         self.sources.get(id.as_u16() as usize).unwrap()
     }
 
-    fn get_mut_inner_source(&mut self, id: SourceId) -> &mut InnerSource {
-        // We treat all `SourceId`s as valid
+    fn get_mut_inner_source(&mut self, id: FileId) -> &mut InnerSource {
+        // We treat all `FileId`s as valid
         self.sources.as_mut().get_mut(id.as_u16() as usize).unwrap()
     }
 }

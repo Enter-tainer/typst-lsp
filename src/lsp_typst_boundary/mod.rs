@@ -233,10 +233,10 @@ pub mod typst_to_lsp {
         const_config: &ConstConfig,
     ) -> Option<(LspUri, LspDiagnostic)> {
         let typst_span = typst_error.span;
-        let typst_source = world.source(typst_span.source());
+        let typst_source = world.source(typst_span.id()).unwrap();
 
-        let typst_range = typst_source.range(typst_span);
-        let lsp_range = range(typst_range, typst_source, const_config.position_encoding);
+        let typst_range = typst_source.find(typst_span).unwrap().range();
+        let lsp_range = range(typst_range, &typst_source, const_config.position_encoding);
 
         let lsp_message = typst_error.message.to_string();
 
@@ -247,7 +247,7 @@ pub mod typst_to_lsp {
             ..Default::default()
         };
 
-        let uri = path_to_uri(typst_source.path()).ok()?;
+        let uri = path_to_uri(typst_source.id().path()).ok()?;
 
         Some((uri, diagnostic))
     }

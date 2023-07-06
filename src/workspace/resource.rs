@@ -2,13 +2,13 @@ use std::fs::File;
 use std::io::{self, Read};
 
 use tower_lsp::lsp_types::Url;
-use typst::util::Buffer;
+use typst::util::Bytes;
 
 /// Files used by Typst source code, like fonts or images
 #[derive(Debug, Clone)]
 pub struct Resource {
     // This is driven by the interface of Typst's `World` trait and `Font` struct
-    buffer: Buffer,
+    buffer: Bytes,
 }
 
 impl Resource {
@@ -17,7 +17,7 @@ impl Resource {
         Ok(Self { buffer })
     }
 
-    fn read_file_to_buffer(uri: &Url) -> io::Result<Buffer> {
+    fn read_file_to_buffer(uri: &Url) -> io::Result<Bytes> {
         let path = uri.to_file_path().map_err(|_| {
             io::Error::new(
                 io::ErrorKind::NotFound,
@@ -29,13 +29,13 @@ impl Resource {
         let mut buffer_data = Vec::new();
         file.read_to_end(&mut buffer_data)?;
 
-        let buffer = Buffer::from(buffer_data);
+        let buffer = Bytes::from(buffer_data);
 
         Ok(buffer)
     }
 }
 
-impl From<Resource> for Buffer {
+impl From<Resource> for Bytes {
     fn from(lsp_resource: Resource) -> Self {
         lsp_resource.buffer
     }
